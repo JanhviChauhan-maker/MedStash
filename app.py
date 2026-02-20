@@ -6,6 +6,10 @@ import collections
 from datetime import datetime, timedelta
 from abc import ABC, abstractmethod
 import math
+import json
+from functools import lru_cache
+from urllib.parse import quote_plus
+from urllib.request import Request, urlopen
 
 # ---------------- DATABASE MANAGER CLASS (ENCAPSULATION & ABSTRACTION) ----------------
 # Encapsulation: Hides database connection details and provides a clean interface
@@ -213,73 +217,214 @@ class AppointmentManager:
 # Abstraction: Hides complex distance calculation logic
 # Encapsulation: Contains all distance-related methods
 class DistanceCalculator:
+    GEOCODE_URL = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q="
+    ROUTE_URL = "https://router.project-osrm.org/route/v1/driving/"
+    HTTP_USER_AGENT = "HealcardGP/1.0 (distance-calculation)"
+
+    # City center coordinates for city-to-city distance fallback (India)
+    CITY_COORDINATES = {
+        'ahmedabad': (23.0225, 72.5714),
+        'amritsar': (31.6340, 74.8723),
+        'aurangabad': (19.8762, 75.3433),
+        'bengaluru': (12.9716, 77.5946),
+        'bhavnagar': (21.7645, 72.1519),
+        'bhopal': (23.2599, 77.4126),
+        'bhubaneswar': (20.2961, 85.8245),
+        'chandigarh': (30.7333, 76.7794),
+        'chennai': (13.0827, 80.2707),
+        'coimbatore': (11.0168, 76.9558),
+        'dehradun': (30.3165, 78.0322),
+        'delhi': (28.6139, 77.2090),
+        'dhanbad': (23.7957, 86.4304),
+        'dimapur': (25.9091, 93.7276),
+        'faridabad': (28.4089, 77.3178),
+        'gangtok': (27.3389, 88.6065),
+        'gaya': (24.7914, 85.0002),
+        'goa': (15.2993, 74.1240),
+        'guwahati': (26.1445, 91.7362),
+        'gurugram': (28.4595, 77.0266),
+        'hyderabad': (17.3850, 78.4867),
+        'imphal': (24.8170, 93.9368),
+        'indore': (22.7196, 75.8577),
+        'itanagar': (27.0844, 93.6053),
+        'jaipur': (26.9124, 75.7873),
+        'jammu': (32.7266, 74.8570),
+        'jamshedpur': (22.8046, 86.2029),
+        'jodhpur': (26.2389, 73.0243),
+        'kanpur': (26.4499, 80.3319),
+        'kochi': (9.9312, 76.2673),
+        'kohima': (25.6751, 94.1086),
+        'kolkata': (22.5726, 88.3639),
+        'kota': (25.2138, 75.8648),
+        'kozhikode': (11.2588, 75.7804),
+        'lucknow': (26.8467, 80.9462),
+        'ludhiana': (30.9010, 75.8573),
+        'madurai': (9.9252, 78.1198),
+        'mangaluru': (12.9141, 74.8560),
+        'mumbai': (19.0760, 72.8777),
+        'mysuru': (12.2958, 76.6394),
+        'nagpur': (21.1458, 79.0882),
+        'nashik': (19.9975, 73.7898),
+        'new delhi': (28.6139, 77.2090),
+        'noida': (28.5355, 77.3910),
+        'panaji': (15.4909, 73.8278),
+        'patna': (25.5941, 85.1376),
+        'port blair': (11.6234, 92.7265),
+        'prayagraj': (25.4358, 81.8463),
+        'puducherry': (11.9416, 79.8083),
+        'pune': (18.5204, 73.8567),
+        'raipur': (21.2514, 81.6296),
+        'rajkot': (22.3039, 70.8022),
+        'ranchi': (23.3441, 85.3096),
+        'siliguri': (26.7271, 88.3953),
+        'shimla': (31.1048, 77.1734),
+        'srinagar': (34.0837, 74.7973),
+        'surat': (21.1702, 72.8311),
+        'thane': (19.2183, 72.9781),
+        'thiruvananthapuram': (8.5241, 76.9366),
+        'thrissur': (10.5276, 76.2144),
+        'udaipur': (24.5854, 73.7125),
+        'vadodara': (22.3072, 73.1812),
+        'varanasi': (25.3176, 82.9739),
+        'vijayawada': (16.5062, 80.6480),
+        'visakhapatnam': (17.6868, 83.2185),
+        'warangal': (17.9689, 79.5941)
+    }
+
+    @staticmethod
+    def _parse_coordinates(address):
+        """Return validated (lat, lon) tuple or None."""
+        try:
+            lat = float(address.get('latitude'))
+            lon = float(address.get('longitude'))
+        except (TypeError, ValueError):
+            return None
+
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            return None
+        return (lat, lon)
+
+    @staticmethod
+    def _normalize_text(value):
+        return (value or '').strip().lower()
+
+    @staticmethod
+    def _request_json(url):
+        req = Request(url, headers={"User-Agent": DistanceCalculator.HTTP_USER_AGENT})
+        with urlopen(req, timeout=6) as response:
+            return json.loads(response.read().decode("utf-8"))
+
+    @staticmethod
+    def _city_coordinates(address):
+        city = DistanceCalculator._normalize_text((address or {}).get('city'))
+        if not city:
+            return None
+        city = city.split(',')[0].strip()
+        return DistanceCalculator.CITY_COORDINATES.get(city)
+
+    @staticmethod
+    def _build_location_query(address):
+        if not address:
+            return ""
+        city = (address.get('city') or '').strip()
+        state = (address.get('state') or '').strip()
+        if not city:
+            return ""
+        parts = [
+            city,
+            state,
+            'India'
+        ]
+        query = ", ".join([p for p in parts if p])
+        return query.strip(", ")
+
+    @staticmethod
+    @lru_cache(maxsize=1024)
+    def _geocode_query(query):
+        if not query:
+            return None
+        try:
+            url = f"{DistanceCalculator.GEOCODE_URL}{quote_plus(query)}"
+            payload = DistanceCalculator._request_json(url)
+            if not payload:
+                return None
+            lat = float(payload[0].get("lat"))
+            lon = float(payload[0].get("lon"))
+            if -90 <= lat <= 90 and -180 <= lon <= 180:
+                return (lat, lon)
+        except Exception:
+            return None
+        return None
+
+    @staticmethod
+    @lru_cache(maxsize=4096)
+    def _road_distance_query(lat1, lon1, lat2, lon2):
+        try:
+            url = (
+                f"{DistanceCalculator.ROUTE_URL}"
+                f"{lon1},{lat1};{lon2},{lat2}"
+                f"?overview=false&alternatives=false&steps=false"
+            )
+            payload = DistanceCalculator._request_json(url)
+            routes = payload.get("routes", [])
+            if not routes:
+                return None
+            meters = routes[0].get("distance")
+            if meters is None:
+                return None
+            return float(meters) / 1000.0
+        except Exception:
+            return None
+
+    @staticmethod
+    def _road_distance_km(coords1, coords2):
+        lat1, lon1 = round(coords1[0], 6), round(coords1[1], 6)
+        lat2, lon2 = round(coords2[0], 6), round(coords2[1], 6)
+        return DistanceCalculator._road_distance_query(lat1, lon1, lat2, lon2)
+
+    @staticmethod
+    def _extract_coordinates(address):
+        # City-to-city mode: use only city/state to determine coordinates
+        query = DistanceCalculator._build_location_query(address)
+        geocoded = DistanceCalculator._geocode_query(query)
+        if geocoded:
+            return geocoded
+
+        # Fallback: static city center dictionary
+        return DistanceCalculator._city_coordinates(address)
+
     @staticmethod
     def calculate_distance(patient_addr, doctor_addr):
         """
-        Calculate distance between addresses using coordinates or text similarity.
-        Uses Data Structure: Dictionary for address components
+        Calculate city-to-city distance between patient and doctor.
+        Uses city/state geocoding and city-center fallback.
         """
         try:
-            # Coordinate-based calculation (Haversine formula)
-            patient_lat = patient_addr.get('latitude')
-            patient_lon = patient_addr.get('longitude')
-            doctor_lat = doctor_addr.get('latitude')
-            doctor_lon = doctor_addr.get('longitude')
+            patient_coords = DistanceCalculator._extract_coordinates(patient_addr)
+            doctor_coords = DistanceCalculator._extract_coordinates(doctor_addr)
+            if not patient_coords or not doctor_coords:
+                return None
 
-            # Validate coordinates are present and valid
-            if (patient_lat is not None and patient_lon is not None and
-                doctor_lat is not None and doctor_lon is not None):
+            lat1, lon1 = patient_coords
+            lat2, lon2 = doctor_coords
+            if lat1 == lat2 and lon1 == lon2:
+                return 0.0
 
-                try:
-                    lat1, lon1 = float(patient_lat), float(patient_lon)
-                    lat2, lon2 = float(doctor_lat), float(doctor_lon)
+            # Prefer real-world drivable distance
+            road_km = DistanceCalculator._road_distance_km(patient_coords, doctor_coords)
+            if road_km is not None:
+                return road_km
 
-                    # Validate coordinate ranges
-                    if (-90 <= lat1 <= 90 and -180 <= lon1 <= 180 and
-                        -90 <= lat2 <= 90 and -180 <= lon2 <= 180):
-
-                        if lat1 == lat2 and lon1 == lon2:
-                            return 0.1
-
-                        R = 6371  # Earth's radius in km
-                        dlat = math.radians(lat2 - lat1)
-                        dlon = math.radians(lon2 - lon1)
-                        a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
-                        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-                        return max(R * c, 0.1)
-                except (ValueError, TypeError, ZeroDivisionError):
-                    pass  # Fall through to text-based calculation
-
-            # Text similarity fallback
-            patient_city = (patient_addr.get('city') or '').split(',')[0].lower().strip()
-            doctor_city = (doctor_addr.get('city') or '').split(',')[0].lower().strip()
-
-            if patient_city == doctor_city and patient_city:
-                return 0.1
-
-
-            # State-based fallback
-            patient_state = (patient_addr.get('state') or '').lower().strip()
-            doctor_state = (doctor_addr.get('state') or '').lower().strip()
-
-            if patient_state == doctor_state and patient_state:
-                return 100.0  # Default intra-state distance
-
-            # Pincode-based fallback (rough estimate)
-            patient_pincode = (patient_addr.get('pincode') or '').strip()
-            doctor_pincode = (doctor_addr.get('pincode') or '').strip()
-
-            if patient_pincode and doctor_pincode and len(patient_pincode) >= 3 and len(doctor_pincode) >= 3:
-                if patient_pincode[:3] == doctor_pincode[:3]:
-                    return 50.0  # Same region
-                elif patient_pincode[:2] == doctor_pincode[:2]:
-                    return 150.0  # Same state/district
-
-            return 200.0  # Default inter-state distance
+            # Fallback to straight-line Haversine distance
+            earth_radius_km = 6371
+            dlat = math.radians(lat2 - lat1)
+            dlon = math.radians(lon2 - lon1)
+            a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+            return earth_radius_km * c
 
         except Exception:
-            # Last resort fallback - never return -1
-            return 150.0
+            return None
 
 # ---------------- DOCTOR SORTER CLASS (USES DATA STRUCTURES) ----------------
 # Uses Heap data structure for efficient sorting by distance
@@ -302,11 +447,12 @@ class DoctorSorter:
             }
 
             distance = calculator.calculate_distance(patient_address, doctor_addr)
-            doctor_dict['distance'] = distance
-            doctor_dict['distance_display'] = f"{distance:.1f} km" if distance != -1 else "N/A"
+            priority_distance = distance if distance is not None else float('inf')
+            doctor_dict['distance'] = priority_distance
+            doctor_dict['distance_display'] = f"{distance:.1f} km" if distance is not None else "N/A"
 
             # Push to heap: (priority, tie_breaker, data)
-            heapq.heappush(distance_heap, (doctor_dict['distance'], doctor_dict['id'], doctor_dict))
+            heapq.heappush(distance_heap, (priority_distance, doctor_dict['id'], doctor_dict))
 
         # Extract sorted list
         sorted_doctors = []
@@ -389,6 +535,51 @@ def static_page():
     """Standalone responsive static page."""
     return render_template("static_page.html")
 
+# ---------------- VALIDATION FUNCTIONS ----------------
+import re
+
+def validate_name(name, field_name):
+    """Validate that name contains only characters (a-z, A-Z)"""
+    if name and not re.match(r'^[a-zA-Z]+$', name):
+        return f"{field_name} should contain only letters (a-z, A-Z)"
+    return None
+
+def validate_city_state(value, field_name):
+    """Validate that city/state contains only characters"""
+    if value and not re.match(r'^[a-zA-Z\s]+$', value):
+        return f"{field_name} should contain only letters"
+    return None
+
+def validate_digits_only(value, field_name):
+    """Validate that field contains only digits"""
+    if value and not re.match(r'^\d+$', str(value)):
+        return f"{field_name} should contain only digits"
+    return None
+
+def validate_no_digits(value, field_name):
+    """Validate that field does not contain any digits"""
+    if value and re.search(r'\d', str(value)):
+        return f"{field_name} should not contain digits"
+    return None
+
+def validate_experience_vs_age(experience, age):
+    """Validate that experience is not greater than (age - 18)"""
+    if experience and age:
+        try:
+            exp = int(experience)
+            age_val = int(age)
+            if exp > (age_val - 18):
+                return f"Experience ({exp} years) cannot be greater than age ({age_val}) minus 18 years"
+        except (ValueError, TypeError):
+            pass
+    return None
+
+def validate_emergency_contact(contact):
+    """Validate emergency contact is exactly 4 digits"""
+    if contact and not re.match(r'^\d{4}$', str(contact)):
+        return "Emergency contact must be exactly 4 digits"
+    return None
+
 # ---------------- REGISTER ----------------
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -403,8 +594,8 @@ def register():
             gender = request.form["gender"]
             dob = request.form.get("dob")
             age = request.form.get("age")
-            email = request.form["email"]
-            mobile = request.form["mobile"]
+            email = request.form["email"].strip().lower()
+            mobile = request.form["mobile"].strip()
             password = request.form["password"]
             role = request.form["role"]
 
@@ -413,14 +604,66 @@ def register():
             patient_pincode = request.form.get("patient_pincode")
             patient_address = request.form.get("patient_address")
 
+            # Server-side validation for name fields
+            errors = []
+            
+            fname_error = validate_name(fname, "First name")
+            if fname_error:
+                errors.append(fname_error)
+            
+            if mname:
+                mname_error = validate_name(mname, "Middle name")
+                if mname_error:
+                    errors.append(mname_error)
+            
+            lname_error = validate_name(lname, "Last name")
+            if lname_error:
+                errors.append(lname_error)
+
+            # Validate city and state (patient profile)
+            if patient_city:
+                city_error = validate_city_state(patient_city, "City")
+                if city_error:
+                    errors.append(city_error)
+            
+            if patient_state:
+                state_error = validate_city_state(patient_state, "State")
+                if state_error:
+                    errors.append(state_error)
+
+            if errors:
+                for error in errors:
+                    flash(error, "danger")
+                return redirect("/register")
+
+            if not re.match(r'^[6-9][0-9]{9}$', mobile):
+                flash("Please enter a valid 10-digit mobile number.", "danger")
+                return redirect("/register")
+
+            existing_email = conn.execute(
+                "SELECT id FROM users WHERE lower(email)=?",
+                (email,)
+            ).fetchone()
+            if existing_email:
+                flash("Email already registered.", "danger")
+                return redirect("/register")
+
+            existing_mobile = conn.execute(
+                "SELECT id FROM users WHERE mobile=?",
+                (mobile,)
+            ).fetchone()
+            if existing_mobile:
+                flash("Mobile number already registered.", "danger")
+                return redirect("/register")
+
             cur = conn.execute("""
                 INSERT INTO users
-                (fname, mname, lname, dob, age, email, password, role,
+                (fname, mname, lname, dob, age, email, mobile, password, role,
                  patient_city, patient_state, patient_pincode, patient_address)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 fname, mname, lname, dob, age,
-                email, password, role,
+                email, mobile, password, role,
                 patient_city, patient_state, patient_pincode, patient_address
             ))
 
@@ -449,6 +692,8 @@ def register():
 
             if "users.email" in str(e):
                 flash("Email already registered.", "danger")
+            elif "users.mobile" in str(e):
+                flash("Mobile number already registered.", "danger")
             else:
                 flash("Registration failed.", "danger")
 
@@ -737,6 +982,10 @@ def doctor_dashboard():
     # Get unread notifications count
     notifications_count = conn.execute("SELECT COUNT(*) as count FROM notifications WHERE user_id=? AND read=0", (session["user_id"],)).fetchone()["count"]
 
+    # Get wallet balance
+    wallet = conn.execute("SELECT balance FROM wallets WHERE user_id=?", (session["user_id"],)).fetchone()
+    wallet_balance = wallet["balance"] if wallet else 0.0
+
     conn.close()
 
     return render_template(
@@ -747,9 +996,25 @@ def doctor_dashboard():
         todays_appointments=todays_appointments,
         upcoming_appointments=upcoming_appointments,
         total_patients=total_patients,
+        wallet_balance=wallet_balance,
         prescriptions=0,  # Placeholder for now
         notifications_count=notifications_count
     )
+
+
+@app.route("/api/wallet_balance")
+def api_wallet_balance():
+    if "user_id" not in session:
+        return {"success": False, "message": "Unauthorized"}, 401
+
+    conn = get_db()
+    wallet = conn.execute("SELECT balance FROM wallets WHERE user_id=?", (session["user_id"],)).fetchone()
+    conn.close()
+
+    return {
+        "success": True,
+        "balance": float(wallet["balance"]) if wallet else 0.0
+    }
 
 # ---------------- DOCTOR APPOINTMENTS ----------------
 @app.route("/doctor/appointments")
@@ -826,6 +1091,19 @@ def doctor_profile():
         flash("Doctor profile not found", "danger")
         return redirect("/doctor/dashboard")
 
+    # Get age from users table (stored at registration time)
+    user = conn.execute(
+        "SELECT age FROM users WHERE id = ?",
+        (session["user_id"],)
+    ).fetchone()
+    
+    # Convert doctor to dict and add age from users table if not present in doctors table
+    doctor_dict = dict(doctor)
+    if not doctor_dict.get('age') and user and user['age']:
+        doctor_dict['age'] = user['age']
+    
+    doctor = doctor_dict
+
     if request.method == "POST":
 
         specialty = request.form.get("specialty")
@@ -846,6 +1124,62 @@ def doctor_profile():
         reviews = request.form.get("reviews")
         awards = request.form.get("awards")
         emergency_contact = request.form.get("emergency_contact")
+
+        # Server-side validation for doctor profile fields
+        errors = []
+
+        # Validate experience vs age (experience <= age - 18)
+        if experience_years and age:
+            exp_error = validate_experience_vs_age(experience_years, age)
+            if exp_error:
+                errors.append(exp_error)
+
+        # Validate license number (digits only)
+        if license_no:
+            license_error = validate_digits_only(license_no, "Medical license number")
+            if license_error:
+                errors.append(license_error)
+
+        # Validate city (characters only)
+        if city:
+            city_error = validate_city_state(city, "City")
+            if city_error:
+                errors.append(city_error)
+
+        # Validate state (characters only)
+        if state:
+            state_error = validate_city_state(state, "State")
+            if state_error:
+                errors.append(state_error)
+
+        # Validate languages (no digits)
+        if languages:
+            lang_error = validate_no_digits(languages, "Languages")
+            if lang_error:
+                errors.append(lang_error)
+
+        # Validate awards (no digits)
+        if awards:
+            awards_error = validate_no_digits(awards, "Awards")
+            if awards_error:
+                errors.append(awards_error)
+
+        # Validate emergency contact (exactly 4 digits)
+        if emergency_contact:
+            emergency_error = validate_emergency_contact(emergency_contact)
+            if emergency_error:
+                errors.append(emergency_error)
+
+        # If there are validation errors, flash them and return
+        if errors:
+            for error in errors:
+                flash(error, "danger")
+            conn.close()
+            return render_template(
+                "doctor_complete_profile.html",
+                doctor=doctor,
+                profile_percent=doctor["profile_percent"]
+            )
 
         # Calculate profile completion percentage
         percent = 25  # Base percentage
@@ -1076,11 +1410,12 @@ def doctor_profile_public(doctor_id):
                 }
 
                 calculated_distance = DistanceCalculator.calculate_distance(patient_addr, doctor_addr)
-                distance = f"{calculated_distance:.1f} km" if calculated_distance != -1 else "N/A"
+                distance = f"{calculated_distance:.1f} km" if calculated_distance is not None else "N/A"
 
     if not doctor:
         conn.close()
         return "Doctor profile incomplete or not found", 404
+
 
     doctor = dict(doctor)
     doctor["fees"] = get_specialty_fees(doctor["specialty"])
@@ -1191,10 +1526,11 @@ def doctors_by_specialty(specialty):
                 'longitude': doctor['longitude']
             }
             distance = DistanceCalculator.calculate_distance(patient_address, doctor_addr)
-            doctor_dict['distance'] = distance
-            doctor_dict['distance_display'] = f"{distance:.1f} km" if distance != -1 else "N/A"
+            priority_distance = distance if distance is not None else float('inf')
+            doctor_dict['distance'] = priority_distance
+            doctor_dict['distance_display'] = f"{distance:.1f} km" if distance is not None else "N/A"
         else:
-            doctor_dict['distance'] = 999
+            doctor_dict['distance'] = float('inf')
             doctor_dict['distance_display'] = "N/A"
         # Push to heap with distance as priority (min-heap for closest first), using doctor id as tie-breaker
         heapq.heappush(distance_heap, (doctor_dict['distance'], doctor_dict['id'], doctor_dict))
@@ -1255,10 +1591,11 @@ def all_doctors():
                 'longitude': doctor['longitude']
             }
             distance = DistanceCalculator.calculate_distance(patient_address, doctor_addr)
-            doctor_dict['distance'] = distance
-            doctor_dict['distance_display'] = f"{distance:.1f} km" if distance != -1 else "N/A"
+            priority_distance = distance if distance is not None else float('inf')
+            doctor_dict['distance'] = priority_distance
+            doctor_dict['distance_display'] = f"{distance:.1f} km" if distance is not None else "N/A"
         else:
-            doctor_dict['distance'] = 999
+            doctor_dict['distance'] = float('inf')
             doctor_dict['distance_display'] = "N/A"
         # Push to heap with distance as priority (min-heap for closest first), using doctor id as tie-breaker
         heapq.heappush(distance_heap, (doctor_dict['distance'], doctor_dict['id'], doctor_dict))
@@ -1984,7 +2321,7 @@ def doctor_patients():
         }
 
         distance = DistanceCalculator.calculate_distance(patient_addr, doctor_addr)
-        patient_dict['distance'] = f"{distance:.1f} km" if distance != -1 else "N/A"
+        patient_dict['distance'] = f"{distance:.1f} km" if distance is not None else "N/A"
 
         patients_with_distance.append(patient_dict)
 
@@ -2255,7 +2592,24 @@ def add_customer():
     conn = None
     try:
         conn = get_db()
-        conn.execute("""INSERT INTO users (fname, lname, email, mobile, patient_city, patient_state, role) VALUES (?, ?, ?, ?, ?, ?, 'user')""", (data['fname'], data['lname'], data['email'], data['mobile'], data['city'], data['state']))
+        email = (data.get('email') or '').strip().lower()
+        mobile = (data.get('mobile') or '').strip()
+
+        existing_email = conn.execute(
+            "SELECT id FROM users WHERE lower(email)=?",
+            (email,)
+        ).fetchone()
+        if existing_email:
+            return {"success": False, "message": "Email already registered."}
+
+        existing_mobile = conn.execute(
+            "SELECT id FROM users WHERE mobile=?",
+            (mobile,)
+        ).fetchone()
+        if existing_mobile:
+            return {"success": False, "message": "Mobile number already registered."}
+
+        conn.execute("""INSERT INTO users (fname, lname, email, mobile, patient_city, patient_state, role) VALUES (?, ?, ?, ?, ?, ?, 'user')""", (data['fname'], data['lname'], email, mobile, data['city'], data['state']))
         conn.commit()
         return {"success": True}
     except sqlite3.IntegrityError as e:
@@ -2263,6 +2617,8 @@ def add_customer():
             conn.rollback()
         if "users.email" in str(e):
             return {"success": False, "message": "Email already registered."}
+        elif "users.mobile" in str(e):
+            return {"success": False, "message": "Mobile number already registered."}
         else:
             return {"success": False, "message": "Registration failed."}
     finally:
@@ -2352,12 +2708,26 @@ def _style_vitals_axes(ax, fig):
     ax.grid(axis='y', color='#334155', alpha=0.22, linestyle='-', linewidth=0.8)
     ax.grid(axis='x', alpha=0.0)
 
-def _plot_glow_series(ax, x, y, color, label=None, show_slope=False):
+def _plot_glow_series(ax, x, y, color, label=None, show_slope=False, single_point_baseline=None):
     """Draw a matte pro line series with optional slope trendline."""
-    ax.plot(
-        x, y, color=color, linewidth=2.4, alpha=0.95,
-        solid_joinstyle='round', solid_capstyle='round', label=label
-    )
+    if len(x) == 1 and len(y) == 1 and single_point_baseline is not None:
+        # Keep connector visible even with a single sample.
+        x0 = x[0]
+        ax.plot(
+            [x0 - 0.35, x0],
+            [single_point_baseline, y[0]],
+            color=color,
+            linewidth=2.4,
+            alpha=0.95,
+            solid_joinstyle='round',
+            solid_capstyle='round',
+            label=label
+        )
+    else:
+        ax.plot(
+            x, y, color=color, linewidth=2.4, alpha=0.95,
+            solid_joinstyle='round', solid_capstyle='round', label=label
+        )
     ax.scatter(x, y, s=14, color=color, alpha=0.9, zorder=4)
 
     if y:
@@ -2414,7 +2784,7 @@ def weight_chart():
         dates = [row['date'] for row in weights]
         x_pos = list(range(len(dates)))
         weight_values = [row['weight'] for row in weights]
-        _plot_glow_series(ax, x_pos, weight_values, '#22d3ee', show_slope=True)
+        _plot_glow_series(ax, x_pos, weight_values, '#22d3ee', show_slope=True, single_point_baseline=0)
         ax.set_xticks(x_pos)
         ax.set_xticklabels(dates)
     else:
@@ -2480,7 +2850,7 @@ def height_chart():
         dates = [row['date'] for row in heights]
         x_pos = list(range(len(dates)))
         height_values = [row['height'] for row in heights]
-        _plot_glow_series(ax, x_pos, height_values, '#2dd4bf', show_slope=True)
+        _plot_glow_series(ax, x_pos, height_values, '#2dd4bf', show_slope=True, single_point_baseline=0)
         ax.set_xticks(x_pos)
         ax.set_xticklabels(dates)
     else:
@@ -2548,8 +2918,8 @@ def bp_chart():
         systolic = [row['bp_systolic'] for row in bp_rows]
         diastolic = [row['bp_diastolic'] for row in bp_rows]
 
-        _plot_glow_series(ax, x_pos, systolic, '#22d3ee', 'Systolic', show_slope=True)
-        _plot_glow_series(ax, x_pos, diastolic, '#38bdf8', 'Diastolic', show_slope=True)
+        _plot_glow_series(ax, x_pos, systolic, '#22d3ee', 'Systolic', show_slope=True, single_point_baseline=120)
+        _plot_glow_series(ax, x_pos, diastolic, '#38bdf8', 'Diastolic', show_slope=True, single_point_baseline=120)
         ax.set_xticks(x_pos)
         ax.set_xticklabels(dates)
         legend = ax.legend(
@@ -2642,7 +3012,7 @@ def vitals_svg(chart_type):
             dates = [r["date"] for r in rows]
             x_pos = list(range(len(dates)))
             y = [r["weight"] for r in rows]
-            _plot_glow_series(ax, x_pos, y, '#22d3ee', show_slope=True)
+            _plot_glow_series(ax, x_pos, y, '#22d3ee', show_slope=True, single_point_baseline=0)
             ax.set_xticks(x_pos)
             ax.set_xticklabels(dates)
         else:
@@ -2657,7 +3027,7 @@ def vitals_svg(chart_type):
             dates = [r["date"] for r in rows]
             x_pos = list(range(len(dates)))
             y = [r["height"] for r in rows]
-            _plot_glow_series(ax, x_pos, y, '#2dd4bf', show_slope=True)
+            _plot_glow_series(ax, x_pos, y, '#2dd4bf', show_slope=True, single_point_baseline=0)
             ax.set_xticks(x_pos)
             ax.set_xticklabels(dates)
         else:
@@ -2673,8 +3043,8 @@ def vitals_svg(chart_type):
             x_pos = list(range(len(dates)))
             systolic = [r["bp_systolic"] for r in rows]
             diastolic = [r["bp_diastolic"] for r in rows]
-            _plot_glow_series(ax, x_pos, systolic, '#22d3ee', 'Systolic', show_slope=True)
-            _plot_glow_series(ax, x_pos, diastolic, '#38bdf8', 'Diastolic', show_slope=True)
+            _plot_glow_series(ax, x_pos, systolic, '#22d3ee', 'Systolic', show_slope=True, single_point_baseline=120)
+            _plot_glow_series(ax, x_pos, diastolic, '#38bdf8', 'Diastolic', show_slope=True, single_point_baseline=120)
             ax.set_xticks(x_pos)
             ax.set_xticklabels(dates)
             legend = ax.legend(facecolor='#121b2d', edgecolor='#334155', framealpha=0.9, loc='upper left')

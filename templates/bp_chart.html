@@ -32,9 +32,15 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 const vitals = data.vitals.filter(v => v.bp_systolic !== null && v.bp_diastolic !== null);
-                const labels = vitals.map(v => new Date(v.date).toLocaleDateString());
-                const systolic = vitals.map(v => v.bp_systolic);
-                const diastolic = vitals.map(v => v.bp_diastolic);
+                let labels = vitals.map(v => new Date(v.date).toLocaleDateString());
+                let systolic = vitals.map(v => v.bp_systolic);
+                let diastolic = vitals.map(v => v.bp_diastolic);
+
+                if (systolic.length === 1) {
+                    labels = ['Reference', ...labels];
+                    systolic = [120, ...systolic];
+                    diastolic = [120, ...diastolic];
+                }
 
                 const ctx = document.getElementById('bpChart').getContext('2d');
                 new Chart(ctx, {
@@ -44,20 +50,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         datasets: [{
                             label: 'Systolic (mmHg)',
                             data: systolic,
-                            borderColor: 'rgb(255, 99, 132)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            borderColor: 'rgb(34, 211, 238)',
+                            backgroundColor: 'rgba(34, 211, 238, 0.15)',
                             tension: 0.1,
-                            pointBackgroundColor: 'rgb(255, 99, 132)',
+                            pointBackgroundColor: 'rgb(34, 211, 238)',
                             pointBorderColor: '#fff',
                             pointBorderWidth: 2,
                             pointRadius: 5
                         }, {
                             label: 'Diastolic (mmHg)',
                             data: diastolic,
-                            borderColor: 'rgb(255, 159, 64)',
-                            backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                            borderColor: 'rgb(56, 189, 248)',
+                            backgroundColor: 'rgba(56, 189, 248, 0.15)',
                             tension: 0.1,
-                            pointBackgroundColor: 'rgb(255, 159, 64)',
+                            pointBackgroundColor: 'rgb(56, 189, 248)',
                             pointBorderColor: '#fff',
                             pointBorderWidth: 2,
                             pointRadius: 5

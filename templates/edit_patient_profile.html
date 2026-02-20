@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
 
-<!-- ================= BACK BUTTON ================= -->
 <div class="profile-back-btn">
   <a href="/profile" title="Back">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -14,289 +13,498 @@
   </a>
 </div>
 
-<div class="container mt-4">
+<div class="container page-wrap py-4">
+  <div class="card edit-profile-card mx-auto">
+    <div class="card-body p-4 p-md-5">
+      <h3 class="title mb-3">
+        <i class="fa-solid fa-user-pen me-2"></i>Edit Patient Profile
+      </h3>
+      <p class="subtitle mb-4">Update location details for accurate nearby doctor sorting.</p>
 
-  <!-- Edit Patient Profile Card -->
-  <div class="card p-4 edit-profile-card">
+      <form method="POST" id="editProfileForm" novalidate>
+        <div class="section-head mb-3">Address Details</div>
 
-    <h3 class="text-info mb-4">
-      <i class="fa-solid fa-edit"></i> Edit Profile
-    </h3>
-
-    <form method="POST" id="editProfileForm" novalidate>
-
-      <!-- Address Information Section -->
-      <div class="profile-section mb-4">
-        <h5 class="text-info mb-3">
-          <i class="fa-solid fa-map-marker-alt"></i> Address Information
-        </h5>
-
-        <div class="row">
+        <div class="row g-3">
           <div class="col-md-6">
-            <div class="mb-3">
-              <label for="patient_city" class="form-label text-white">City</label>
-              <input type="text" class="form-control" id="patient_city" name="patient_city"
-                     value="{{ user.patient_city or '' }}" placeholder="Enter your city">
-            </div>
+            <label for="patient_state" class="form-label">State</label>
+            <select class="form-select form-field" id="patient_state" name="patient_state"
+                    data-selected="{{ user.patient_state or '' }}" required>
+              <option value="">Select State</option>
+            </select>
+            <div class="invalid-feedback">Please select state.</div>
           </div>
-          <div class="col-md-6">
-            <div class="mb-3">
-              <label for="patient_state" class="form-label text-white">State</label>
-              <input type="text" class="form-control" id="patient_state" name="patient_state"
-                     value="{{ user.patient_state or '' }}" placeholder="Enter your state">
-            </div>
-          </div>
-        </div>
 
-        <div class="row">
           <div class="col-md-6">
-            <div class="mb-3">
-              <label for="patient_pincode" class="form-label text-white">Pincode</label>
-              <input type="text" class="form-control" id="patient_pincode" name="patient_pincode"
-                     value="{{ user.patient_pincode or '' }}" placeholder="Enter your 6-digit pincode"
-                     pattern="[0-9]{6}" maxlength="6" required>
-              <div class="invalid-feedback">Pincode must be exactly 6 digits.</div>
-            </div>
+            <label for="patient_city" class="form-label">City</label>
+            <select class="form-select form-field" id="patient_city" name="patient_city"
+                    data-selected="{{ user.patient_city or '' }}" required disabled>
+              <option value="">Select City</option>
+            </select>
+            <div class="invalid-feedback">Please select city.</div>
           </div>
-          <div class="col-md-6">
-            <div class="mb-3">
-              <label for="patient_address" class="form-label text-white">Full Address</label>
-              <input type="text" class="form-control" id="patient_address" name="patient_address"
-                     value="{{ user.patient_address or '' }}" placeholder="Enter your full address">
-            </div>
-          </div>
-        </div>
 
-        <div class="row">
           <div class="col-md-6">
-            <div class="mb-3">
-              <label for="patient_latitude" class="form-label text-white">Latitude (Optional)</label>
-              <input type="text" class="form-control" id="patient_latitude" name="patient_latitude"
-                     value="{{ user.patient_latitude or '' }}" placeholder="e.g., 28.6139">
-              <small class="text-secondary">For precise location-based doctor sorting</small>
-            </div>
+            <label for="patient_pincode" class="form-label">Pincode</label>
+            <input type="text" class="form-control form-field" id="patient_pincode" name="patient_pincode"
+                   value="{{ user.patient_pincode or '' }}"
+                   placeholder="6-digit pincode" pattern="^[1-9][0-9]{5}$" maxlength="6" required>
+            <div class="invalid-feedback">Enter valid 6-digit pincode.</div>
           </div>
+
           <div class="col-md-6">
-            <div class="mb-3">
-              <label for="patient_longitude" class="form-label text-white">Longitude (Optional)</label>
-              <input type="text" class="form-control" id="patient_longitude" name="patient_longitude"
-                     value="{{ user.patient_longitude or '' }}" placeholder="e.g., 77.2090">
-              <small class="text-secondary">For precise location-based doctor sorting</small>
-            </div>
+            <label for="patient_address" class="form-label">Full Address</label>
+            <input type="text" class="form-control form-field" id="patient_address" name="patient_address"
+                   value="{{ user.patient_address or '' }}"
+                   placeholder="House no, street, area" required minlength="10">
+            <div class="invalid-feedback">Address must be at least 10 characters.</div>
+          </div>
+
+          <div class="col-md-6">
+            <label for="patient_latitude" class="form-label">Latitude (Optional)</label>
+            <input type="text" class="form-control form-field" id="patient_latitude" name="patient_latitude"
+                   value="{{ user.patient_latitude or '' }}" placeholder="e.g. 22.3072">
+            <div class="invalid-feedback">Latitude must be between -90 and 90.</div>
+          </div>
+
+          <div class="col-md-6">
+            <label for="patient_longitude" class="form-label">Longitude (Optional)</label>
+            <input type="text" class="form-control form-field" id="patient_longitude" name="patient_longitude"
+                   value="{{ user.patient_longitude or '' }}" placeholder="e.g. 73.1812">
+            <div class="invalid-feedback">Longitude must be between -180 and 180.</div>
           </div>
         </div>
-      </div>
 
-      <!-- Action Buttons -->
-      <div class="text-center mt-4">
-        <button type="submit" class="btn btn-info me-2">
-          <i class="fa-solid fa-save"></i> Save Changes
-        </button>
-        <a href="/profile" class="btn btn-outline-secondary">
-          <i class="fa-solid fa-times"></i> Cancel
-        </a>
-      </div>
+        <div class="location-tools mt-3">
+          <button type="button" id="useCurrentLocationBtn" class="btn btn-locate">
+            <i class="fa-solid fa-location-crosshairs me-2"></i>Use Current Location
+          </button>
+          <span id="locationStatus" class="location-status"></span>
+        </div>
 
-    </form>
-
+        <div class="action-row mt-4">
+          <button type="submit" class="btn btn-save">
+            <i class="fa-solid fa-floppy-disk me-2"></i>Save Changes
+          </button>
+          <a href="/profile" class="btn btn-cancel">
+            <i class="fa-solid fa-xmark me-2"></i>Cancel
+          </a>
+        </div>
+      </form>
+    </div>
   </div>
-
 </div>
 
-<!-- Validation Script -->
 <script>
-const form = document.getElementById('editProfileForm');
+const form = document.getElementById("editProfileForm");
+const stateSelect = document.getElementById("patient_state");
+const citySelect = document.getElementById("patient_city");
+const pincodeInput = document.getElementById("patient_pincode");
+const latitudeInput = document.getElementById("patient_latitude");
+const longitudeInput = document.getElementById("patient_longitude");
+const useCurrentLocationBtn = document.getElementById("useCurrentLocationBtn");
+const locationStatus = document.getElementById("locationStatus");
 
-// Pincode input - only allow digits
-const pincodeInput = document.getElementById('patient_pincode');
-if (pincodeInput) {
-  pincodeInput.addEventListener('input', function() {
-    this.value = this.value.replace(/[^0-9]/g, '').slice(0, 6);
+const indiaStateCities = {
+  "Andhra Pradesh": ["Visakhapatnam", "Vijayawada", "Guntur", "Nellore", "Kurnool", "Rajahmundry"],
+  "Arunachal Pradesh": ["Itanagar", "Naharlagun", "Tawang", "Pasighat", "Ziro"],
+  "Assam": ["Guwahati", "Silchar", "Dibrugarh", "Jorhat", "Nagaon", "Tezpur"],
+  "Bihar": ["Patna", "Gaya", "Muzaffarpur", "Bhagalpur", "Purnia", "Darbhanga"],
+  "Chhattisgarh": ["Raipur", "Bilaspur", "Durg", "Bhilai", "Korba", "Rajnandgaon"],
+  "Goa": ["Panaji", "Margao", "Vasco da Gama", "Mapusa", "Ponda"],
+  "Gujarat": ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar", "Jamnagar"],
+  "Haryana": ["Gurugram", "Faridabad", "Panipat", "Ambala", "Hisar", "Karnal"],
+  "Himachal Pradesh": ["Shimla", "Mandi", "Solan", "Dharamshala", "Kullu", "Hamirpur"],
+  "Jharkhand": ["Ranchi", "Jamshedpur", "Dhanbad", "Bokaro", "Hazaribagh", "Deoghar"],
+  "Karnataka": ["Bengaluru", "Mysuru", "Mangaluru", "Hubballi", "Belagavi", "Shivamogga"],
+  "Kerala": ["Thiruvananthapuram", "Kochi", "Kozhikode", "Thrissur", "Kollam", "Kannur"],
+  "Madhya Pradesh": ["Bhopal", "Indore", "Gwalior", "Jabalpur", "Ujjain", "Sagar"],
+  "Maharashtra": ["Mumbai", "Pune", "Nagpur", "Nashik", "Aurangabad", "Thane"],
+  "Manipur": ["Imphal", "Thoubal", "Bishnupur", "Churachandpur", "Kakching"],
+  "Meghalaya": ["Shillong", "Tura", "Jowai", "Nongpoh", "Baghmara"],
+  "Mizoram": ["Aizawl", "Lunglei", "Champhai", "Serchhip", "Kolasib"],
+  "Nagaland": ["Kohima", "Dimapur", "Mokokchung", "Wokha", "Tuensang"],
+  "Odisha": ["Bhubaneswar", "Cuttack", "Rourkela", "Puri", "Sambalpur", "Berhampur"],
+  "Punjab": ["Ludhiana", "Amritsar", "Jalandhar", "Patiala", "Bathinda", "Mohali"],
+  "Rajasthan": ["Jaipur", "Jodhpur", "Kota", "Udaipur", "Bikaner", "Ajmer"],
+  "Sikkim": ["Gangtok", "Namchi", "Geyzing", "Mangan", "Rangpo"],
+  "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Salem", "Tiruchirappalli", "Vellore"],
+  "Telangana": ["Hyderabad", "Warangal", "Nizamabad", "Karimnagar", "Khammam", "Nalgonda"],
+  "Tripura": ["Agartala", "Udaipur", "Dharmanagar", "Kailasahar", "Belonia"],
+  "Uttar Pradesh": ["Lucknow", "Kanpur", "Varanasi", "Agra", "Prayagraj", "Noida"],
+  "Uttarakhand": ["Dehradun", "Haridwar", "Rishikesh", "Haldwani", "Roorkee"],
+  "West Bengal": ["Kolkata", "Howrah", "Durgapur", "Asansol", "Siliguri", "Kharagpur"],
+  "Andaman Nicobar Islands": ["Port Blair"],
+  "Chandigarh": ["Chandigarh"],
+  "Dadra Nagar Haveli and Daman Diu": ["Daman", "Diu", "Silvassa"],
+  "Delhi": ["New Delhi", "North Delhi", "South Delhi", "East Delhi", "West Delhi"],
+  "Jammu Kashmir": ["Srinagar", "Jammu", "Anantnag", "Baramulla", "Kathua"],
+  "Ladakh": ["Leh", "Kargil"],
+  "Lakshadweep": ["Kavaratti"],
+  "Puducherry": ["Puducherry", "Karaikal", "Mahe", "Yanam"]
+};
+
+function populateStates(selectedState) {
+  stateSelect.innerHTML = '<option value="">Select State</option>';
+  const states = Object.keys(indiaStateCities).sort();
+
+  if (selectedState && !states.includes(selectedState)) {
+    const legacy = document.createElement("option");
+    legacy.value = selectedState;
+    legacy.textContent = selectedState;
+    stateSelect.appendChild(legacy);
+  }
+
+  states.forEach((stateName) => {
+    const option = document.createElement("option");
+    option.value = stateName;
+    option.textContent = stateName;
+    stateSelect.appendChild(option);
   });
+
+  if (selectedState) stateSelect.value = selectedState;
 }
 
-// Clear validation messages on input
-form.querySelectorAll('input').forEach(function(field) {
-  field.addEventListener('input', function() {
-    if (this.checkValidity()) {
-      this.classList.remove('is-invalid');
-    }
+function populateCities(stateName, selectedCity) {
+  citySelect.innerHTML = '<option value="">Select City</option>';
+
+  if (!stateName || !indiaStateCities[stateName]) {
+    citySelect.disabled = true;
+    return;
+  }
+
+  citySelect.disabled = false;
+  const cities = indiaStateCities[stateName];
+
+  if (selectedCity && !cities.includes(selectedCity)) {
+    const legacy = document.createElement("option");
+    legacy.value = selectedCity;
+    legacy.textContent = selectedCity;
+    citySelect.appendChild(legacy);
+  }
+
+  cities.forEach((cityName) => {
+    const option = document.createElement("option");
+    option.value = cityName;
+    option.textContent = cityName;
+    citySelect.appendChild(option);
   });
+
+  if (selectedCity) citySelect.value = selectedCity;
+}
+
+function setInvalid(field, message) {
+  field.classList.add("is-invalid");
+  const feedback = field.parentElement.querySelector(".invalid-feedback");
+  if (feedback && message) feedback.textContent = message;
+}
+
+function clearInvalid(field) {
+  field.classList.remove("is-invalid");
+}
+
+function validateCoordinate(field, min, max, label) {
+  const raw = field.value.trim();
+  if (!raw) return true;
+  const num = Number(raw);
+  if (Number.isNaN(num) || num < min || num > max) {
+    setInvalid(field, `${label} must be between ${min} and ${max}.`);
+    return false;
+  }
+  return true;
+}
+
+function fillCurrentLocation() {
+  if (!navigator.geolocation) {
+    locationStatus.textContent = "Geolocation is not supported in this browser.";
+    return;
+  }
+
+  locationStatus.textContent = "Fetching location...";
+  useCurrentLocationBtn.disabled = true;
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      latitudeInput.value = position.coords.latitude.toFixed(6);
+      longitudeInput.value = position.coords.longitude.toFixed(6);
+      clearInvalid(latitudeInput);
+      clearInvalid(longitudeInput);
+      locationStatus.textContent = "Location captured.";
+      useCurrentLocationBtn.disabled = false;
+    },
+    () => {
+      locationStatus.textContent = "Unable to fetch location. Please allow location permission.";
+      useCurrentLocationBtn.disabled = false;
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+}
+
+const initialState = stateSelect.dataset.selected || "";
+const initialCity = citySelect.dataset.selected || "";
+populateStates(initialState);
+populateCities(initialState, initialCity);
+
+if (!latitudeInput.value.trim() || !longitudeInput.value.trim()) {
+  fillCurrentLocation();
+}
+
+stateSelect.addEventListener("change", () => {
+  populateCities(stateSelect.value, "");
+  clearInvalid(stateSelect);
+  clearInvalid(citySelect);
 });
 
-// Validate on submit
-form.addEventListener('submit', function(e) {
+useCurrentLocationBtn.addEventListener("click", fillCurrentLocation);
+
+pincodeInput.addEventListener("input", function() {
+  this.value = this.value.replace(/\D/g, "").slice(0, 6);
+});
+
+form.querySelectorAll("input, select").forEach((field) => {
+  field.addEventListener("input", () => clearInvalid(field));
+  field.addEventListener("change", () => clearInvalid(field));
+});
+
+form.addEventListener("submit", function(e) {
   let valid = true;
-  form.querySelectorAll('input').forEach(function(field) {
-    if (field.hasAttribute('required') && !field.checkValidity()) {
-      valid = false;
-      field.classList.add('is-invalid');
-    } else if (field.checkValidity() || !field.hasAttribute('required')) {
-      field.classList.remove('is-invalid');
+
+  form.querySelectorAll(".is-invalid").forEach((field) => field.classList.remove("is-invalid"));
+
+  if (!stateSelect.value) {
+    setInvalid(stateSelect, "Please select state.");
+    valid = false;
+  }
+
+  if (!citySelect.value) {
+    setInvalid(citySelect, "Please select city.");
+    valid = false;
+  }
+
+  if (!/^[1-9][0-9]{5}$/.test(pincodeInput.value.trim())) {
+    setInvalid(pincodeInput, "Enter valid 6-digit pincode.");
+    valid = false;
+  }
+
+  const addressInput = document.getElementById("patient_address");
+  if (addressInput.value.trim().length < 10) {
+    setInvalid(addressInput, "Address must be at least 10 characters.");
+    valid = false;
+  }
+
+  if (!validateCoordinate(latitudeInput, -90, 90, "Latitude")) valid = false;
+  if (!validateCoordinate(longitudeInput, -180, 180, "Longitude")) valid = false;
+
+  if (!valid) {
+    e.preventDefault();
+    const firstInvalid = form.querySelector(".is-invalid");
+    if (firstInvalid) {
+      firstInvalid.focus();
+      firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  });
-  if (!valid) e.preventDefault();
+  }
 });
 </script>
 
 <style>
-.invalid-feedback {
-  display: none !important;
-  color: #ff6b6b;
-  font-size: 0.85rem;
-  margin-top: 6px;
-  animation: fadeIn 0.3s ease forwards;
+:root {
+  --bg: #0b1220;
+  --card: #121b2d;
+  --card-2: #17243a;
+  --line: rgba(77, 208, 225, 0.25);
+  --line-strong: #4dd0e1;
+  --txt: #e8f7ff;
+  --txt-soft: #9ec4d1;
+  --danger: #ff6b6b;
 }
 
-.form-control.is-invalid {
-  border-color: #ff6b6b !important;
-  background: rgba(255, 107, 107, 0.05);
+body {
+  background: radial-gradient(circle at 20% -10%, #1a2a48 0%, #0b1220 45%, #09101d 100%) !important;
 }
 
-.is-invalid ~ .invalid-feedback,
-.form-control.is-invalid + .invalid-feedback {
-  display: block !important;
+.page-wrap {
+  min-height: 92vh;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-</style>
-
-<style>
 .edit-profile-card {
-  background: linear-gradient(135deg, #121b2d 0%, #1a2332 100%);
+  max-width: 900px;
+  border: 1px solid var(--line);
   border-radius: 20px;
-  box-shadow: 0 15px 35px rgba(0,0,0,0.6);
-  border: 1px solid rgba(77, 208, 225, 0.1);
-  color: white;
-  max-width: 800px;
-  margin: 0 auto;
+  background: linear-gradient(145deg, rgba(18, 27, 45, 0.96), rgba(23, 36, 58, 0.96));
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
 }
 
-.profile-section {
-  background: rgba(77, 208, 225, 0.05);
-  border-radius: 15px;
-  padding: 20px;
-  margin-bottom: 20px;
-  border: 1px solid rgba(77, 208, 225, 0.1);
+.title {
+  color: var(--line-strong);
+  font-weight: 700;
+  letter-spacing: 0.2px;
 }
 
-.profile-section h5 {
-  border-bottom: 2px solid rgba(77, 208, 225, 0.3);
+.subtitle {
+  margin: 0;
+  color: var(--txt-soft);
+  font-size: 0.95rem;
+}
+
+.section-head {
+  color: var(--txt);
+  font-weight: 600;
+  border-bottom: 1px solid rgba(77, 208, 225, 0.25);
   padding-bottom: 10px;
-  margin-bottom: 20px;
-}
-
-.form-control {
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px solid rgba(77, 208, 225, 0.2);
-  border-radius: 10px;
-  color: white;
-  padding: 12px 16px;
-  transition: all 0.3s ease;
-}
-
-.form-control:focus {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: #4dd0e1;
-  box-shadow: 0 0 0 0.2rem rgba(77, 208, 225, 0.25);
-  color: white;
-}
-
-.form-control::placeholder {
-  color: rgba(255, 255, 255, 0.6);
 }
 
 .form-label {
+  color: #d7effa;
   font-weight: 600;
-  margin-bottom: 8px;
+  margin-bottom: 7px;
 }
 
-.btn-info {
-  background: linear-gradient(135deg, #4dd0e1 0%, #26a69a 100%);
-  border: none;
+.form-field {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--txt);
+  border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 12px 30px;
-  font-weight: 600;
-  font-size: 16px;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(77, 208, 225, 0.3);
+  padding: 11px 14px;
 }
 
-.btn-info:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(77, 208, 225, 0.4);
-  background: linear-gradient(135deg, #26a69a 0%, #4dd0e1 100%);
+.form-field:focus {
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 0.2rem rgba(77, 208, 225, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--txt);
 }
 
-.btn-outline-secondary {
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  color: white;
-  border-radius: 12px;
-  padding: 12px 30px;
-  font-weight: 600;
-  transition: all 0.3s ease;
+.form-field::placeholder {
+  color: #9ab0bc;
 }
 
-.btn-outline-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.5);
-  transform: translateY(-2px);
+.form-select.form-field {
+  background-image: linear-gradient(45deg, transparent 50%, #76dce9 50%),
+                    linear-gradient(135deg, #76dce9 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(1em + 1px), calc(100% - 13px) calc(1em + 1px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 40px;
 }
 
-small {
-  font-size: 12px;
+.form-select.form-field option {
+  background: #121b2d;
+  color: #e8f7ff;
+}
+
+.form-field:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.form-field.is-invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 0.15rem rgba(255, 107, 107, 0.2);
+}
+
+.invalid-feedback {
+  display: none;
+  color: #ff9b9b;
+  font-size: 0.83rem;
+  margin-top: 6px;
+}
+
+.form-field.is-invalid + .invalid-feedback {
   display: block;
-  margin-top: 4px;
+}
+
+.action-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.location-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-locate {
+  color: #d8f9ff;
+  border: 1px solid rgba(77, 208, 225, 0.45);
+  background: rgba(77, 208, 225, 0.12);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-weight: 600;
+}
+
+.btn-locate:hover {
+  background: rgba(77, 208, 225, 0.2);
+  color: #effcff;
+}
+
+.btn-locate:disabled {
+  opacity: 0.6;
+}
+
+.location-status {
+  color: var(--txt-soft);
+  font-size: 0.88rem;
+}
+
+.btn-save,
+.btn-cancel {
+  border-radius: 12px;
+  padding: 11px 20px;
+  font-weight: 600;
+}
+
+.btn-save {
+  color: #062d36;
+  border: none;
+  background: linear-gradient(135deg, #4dd0e1, #26bfae);
+}
+
+.btn-save:hover {
+  background: linear-gradient(135deg, #6be6f2, #34d3c1);
+}
+
+.btn-cancel {
+  color: #d5eaf5;
+  border: 1px solid rgba(213, 234, 245, 0.28);
+  background: transparent;
+}
+
+.btn-cancel:hover {
+  color: #ffffff;
+  border-color: rgba(213, 234, 245, 0.5);
+  background: rgba(213, 234, 245, 0.08);
+}
+
+.profile-back-btn {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 20;
+}
+
+.profile-back-btn a {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #0b1220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+  transition: 0.2s;
+}
+
+.profile-back-btn a:hover {
+  transform: translateX(-3px);
+  background: #111a30;
 }
 
 @media (max-width: 768px) {
   .edit-profile-card {
-    margin: 10px;
-    padding: 20px;
+    border-radius: 16px;
   }
-
-  .profile-section {
-    padding: 15px;
-  }
-
-  .form-control {
-    padding: 10px 12px;
-  }
-}
-
-/* back button */
-
-.profile-back-btn{
-  position:fixed;
-  top:16px;
-  left:16px;
-  z-index:10;
-}
-
-.profile-back-btn a{
-  width:40px;
-  height:40px;
-  border-radius:50%;
-  background:#0b1220;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  box-shadow:0 6px 14px rgba(0,0,0,.45);
-  transition:.2s;
-}
-
-.profile-back-btn a:hover{
-  transform:translateX(-3px);
-  background:#111a30;
 }
 </style>
 

@@ -32,8 +32,13 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 const vitals = data.vitals.filter(v => v.weight !== null);
-                const labels = vitals.map(v => new Date(v.date).toLocaleDateString());
-                const weights = vitals.map(v => v.weight);
+                let labels = vitals.map(v => new Date(v.date).toLocaleDateString());
+                let weights = vitals.map(v => v.weight);
+
+                if (weights.length === 1) {
+                    labels = ['Start', ...labels];
+                    weights = [0, ...weights];
+                }
 
                 const ctx = document.getElementById('weightChart').getContext('2d');
                 new Chart(ctx, {

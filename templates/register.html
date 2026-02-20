@@ -46,7 +46,7 @@
     <!-- ROLE -->
     <select name="role" class="form-select mb-3" required>
       <option value="" disabled selected>Select Role</option>
-      <option value="user">User</option>
+      <option value="user">Patient</option>
       <option value="doctor">Doctor</option>
     </select>
     <div class="invalid-feedback">Please select a role.</div>
@@ -64,55 +64,154 @@
 
 <!-- AGE CALCULATION -->
 <script>
-document.getElementById("dob").addEventListener("change", function () {
-  let dob = new Date(this.value);
-  let today = new Date();
-  let age = today.getFullYear() - dob.getFullYear();
-  let m = today.getMonth() - dob.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
-  document.getElementById("age").value = age;
-});
-
-// Toggle patient fields based on role selection
-function togglePatientFields() {
-  const role = document.querySelector('select[name="role"]').value;
-  const patientFields = document.getElementById('patientFields');
-  const patientInputs = patientFields.querySelectorAll('input, textarea');
-
-  if (role === 'user') {
-    patientFields.style.display = 'block';
-    patientInputs.forEach(input => input.setAttribute('required', ''));
-  } else {
-    patientFields.style.display = 'none';
-    patientInputs.forEach(input => input.removeAttribute('required'));
-  }
-}
-
-// Form validation - Show messages only for invalid fields
 const form = document.getElementById('registerForm');
 
-// Clear validation messages on input
-form.querySelectorAll('input, select, textarea').forEach(function(field) {
-  field.addEventListener('input', function() {
-    if (this.checkValidity()) {
-      this.classList.remove('is-invalid');
-    }
-  });
+const fname = document.querySelector('[name="fname"]');
+const mname = document.querySelector('[name="mname"]');
+const lname = document.querySelector('[name="lname"]');
+const dob   = document.getElementById('dob');
+const age   = document.getElementById('age');
+const mobile= document.querySelector('[name="mobile"]');
+const email = document.querySelector('[name="email"]');
+const pass  = document.querySelector('[name="password"]');
+const role  = document.querySelector('[name="role"]');
+
+/* ---------------- AGE CALCULATION ---------------- */
+function calculateAgeFromDob(dobValue){
+  if(!dobValue) return "";
+
+  const birth = new Date(dobValue + "T00:00:00");
+  if (isNaN(birth.getTime())) return "";
+
+  const today = new Date();
+  let calculatedAge = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    calculatedAge--;
+  }
+
+  return calculatedAge;
+}
+
+function syncAgeFromDob(){
+  const calculatedAge = calculateAgeFromDob(dob.value);
+  age.value = calculatedAge === "" ? "" : calculatedAge;
+}
+
+dob.addEventListener("change", syncAgeFromDob);
+dob.addEventListener("input", syncAgeFromDob);
+
+/* ---------------- HELPERS ---------------- */
+function showError(input, message){
+  input.classList.add("is-invalid");
+  input.nextElementSibling.innerText = message;
+}
+
+function clearError(input){
+  input.classList.remove("is-invalid");
+}
+
+/* ---------------- LIVE REMOVE ERROR ---------------- */
+form.querySelectorAll("input,select").forEach(el=>{
+  el.addEventListener("input",()=> clearError(el));
+  el.addEventListener("change",()=> clearError(el));
 });
 
-// Validate on submit - Show messages only for fields with errors
-form.addEventListener('submit', function (e) {
+/* ---------------- FULL VALIDATION ---------------- */
+form.addEventListener("submit",function(e){
+
   let valid = true;
-  form.querySelectorAll('input, select, textarea').forEach(function(field) {
-    if (!field.checkValidity()) {
-      valid = false;
-      field.classList.add('is-invalid');
-    } else {
-      field.classList.remove('is-invalid');
+  let firstInvalid = null;
+
+  // Ensure age is always up-to-date, even if DOB picker doesn't fire change
+  syncAgeFromDob();
+
+  // First name
+  if(fname.value.trim() === ""){
+    showError(fname,"First name is required.");
+    valid=false;
+  }
+  else if(!/^[A-Za-z\s]+$/.test(fname.value)){
+    showError(fname,"First name must contain only letters.");
+    valid=false;
+  }
+
+  // Middle name (optional but no numbers)
+  if(mname.value.trim() !== "" && !/^[A-Za-z\s]+$/.test(mname.value)){
+    showError(mname,"Middle name cannot contain numbers.");
+    valid=false;
+  }
+
+  // Last name
+  if(lname.value.trim() === ""){
+    showError(lname,"Last name is required.");
+    valid=false;
+  }
+  else if(!/^[A-Za-z\s]+$/.test(lname.value)){
+    showError(lname,"Last name must contain only letters.");
+    valid=false;
+  }
+
+  // Gender
+  if(!form.gender.value){
+    showError(form.gender,"Please select your gender.");
+    valid=false;
+  }
+
+  // DOB
+  if(!dob.value){
+    showError(dob,"Please select your date of birth.");
+    valid=false;
+  }
+
+  // Age
+  const ageValue = parseInt(age.value, 10);
+  if(age.value==="" || Number.isNaN(ageValue) || ageValue<=0 || ageValue>120){
+    showError(age,"Invalid age calculated from DOB.");
+    valid=false;
+  }
+
+  // Email
+  if(!email.checkValidity()){
+    showError(email,"Please enter a valid email address.");
+    valid=false;
+  }
+
+  // Mobile
+  if(!/^[6-9][0-9]{9}$/.test(mobile.value)){
+    showError(mobile,"Enter valid 10 digit mobile starting with 6-9.");
+    valid=false;
+  }
+
+  // Password
+  if(pass.value.length < 6){
+    showError(pass,"Password must be at least 6 characters.");
+    valid=false;
+  }
+
+  // Role
+  if(!role.value){
+    showError(role,"Please select a role.");
+    valid=false;
+  }
+
+  /* ---- scroll to first invalid field ---- */
+  if(!valid){
+    e.preventDefault();
+
+    firstInvalid = form.querySelector(".is-invalid");
+    if(firstInvalid){
+      firstInvalid.scrollIntoView({
+        behavior:"smooth",
+        block:"center"
+      });
+      firstInvalid.focus();
     }
-  });
-  if (!valid) e.preventDefault();
+  }
+
 });
+
 </script>
 
 <!-- ================= STYLES ================= -->

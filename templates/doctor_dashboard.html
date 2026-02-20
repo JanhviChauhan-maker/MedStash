@@ -108,7 +108,7 @@
       <div class="card stats-card p-4 flat-card" onclick="window.location.href='/wallet'" style="cursor:pointer;">
         <div class="stats-icon"><i class="fa-solid fa-wallet text-info"></i></div>
         <div class="stats-content">
-          <h3>₹{{ wallet_balance|round(2) if wallet_balance else '0.00' }}</h3>
+          <h3 id="doctorWalletBalance">₹{{ '%.2f'|format(wallet_balance or 0) }}</h3>
           <p class="text-secondary fw-semibold">Wallet Balance</p>
         </div>
       </div>
@@ -368,6 +368,30 @@ document.addEventListener("DOMContentLoaded", function () {
   const welcomeCard = document.getElementById("welcomeCard");
   welcomeCard.style.opacity = "1";
   welcomeCard.style.transform = "translateX(0)";
+
+  const walletBalanceEl = document.getElementById("doctorWalletBalance");
+
+  async function refreshWalletBalance() {
+    if (!walletBalanceEl) return;
+    try {
+      const response = await fetch("/api/wallet_balance", {
+        method: "GET",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        cache: "no-store"
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        walletBalanceEl.textContent = `₹${Number(data.balance).toFixed(2)}`;
+      }
+    } catch (e) {
+      // Keep current value if refresh fails
+    }
+  }
+
+  refreshWalletBalance();
+  setInterval(refreshWalletBalance, 10000);
+  window.addEventListener("focus", refreshWalletBalance);
+  window.addEventListener("pageshow", refreshWalletBalance);
 });
 </script>
 

@@ -50,10 +50,13 @@
 
       <div class="row">
         <div class="col-md-6">
-          <input type="number" name="age" id="age"
+          <input type="hidden" name="age" id="age_hidden" value="{{ doctor.age or '' }}">
+          <input type="number" id="age"
                  class="form-control mb-3"
                  placeholder="Age"
-                 value="{{ doctor.age or '' }}">
+                 value="{{ doctor.age or '' }}"
+                 readonly>
+          <small class="text-white">Age (stored from registration)</small>
         </div>
         <div class="col-md-6">
           <input type="number" name="experience_years" id="experience_years"
@@ -71,6 +74,7 @@
       <input type="text" name="license" id="license"
              class="form-control mb-3"
              placeholder="Medical License Number"
+             pattern="\d+"
              value="{{ doctor.license or '' }}">
 
       <!-- Detailed Address Section -->
@@ -83,16 +87,19 @@
 
       <div class="row">
         <div class="col-md-6">
-          <input type="text" name="city" id="city"
-                 class="form-control mb-3"
-                 placeholder="City"
-                 value="{{ doctor.city or '' }}">
+          <select name="state" id="state"
+                  class="form-select mb-3"
+                  data-selected="{{ doctor.state or '' }}">
+            <option value="">Select State</option>
+          </select>
         </div>
         <div class="col-md-6">
-          <input type="text" name="state" id="state"
-                 class="form-control mb-3"
-                 placeholder="State"
-                 value="{{ doctor.state or '' }}">
+          <select name="city" id="city"
+                  class="form-select mb-3"
+                  data-selected="{{ doctor.city or '' }}"
+                  disabled>
+            <option value="">Select City</option>
+          </select>
         </div>
       </div>
 
@@ -126,6 +133,13 @@
         </div>
       </div>
 
+      <div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
+        <button type="button" id="useCurrentLocationBtn" class="btn btn-outline-info btn-sm">
+          <i class="fa-solid fa-location-crosshairs me-1"></i>Use Current Location
+        </button>
+        <small id="locationStatus" class="text-white-50"></small>
+      </div>
+
       <input type="number" name="staff_count" id="staff_count"
              class="form-control mb-3"
              placeholder="Staff Count"
@@ -134,6 +148,7 @@
       <input type="text" name="languages" id="languages"
              class="form-control mb-3"
              placeholder="Languages Spoken"
+             pattern="[a-zA-Z\s,]+"
              value="{{ doctor.languages or '' }}">
 
       <textarea name="reviews" id="reviews"
@@ -144,11 +159,14 @@
       <textarea name="awards" id="awards"
                 class="form-control mb-3"
                 placeholder="Awards & Certifications"
+                pattern="[a-zA-Z\s,]+"
                 rows="3">{{ doctor.awards or '' }}</textarea>
 
       <input type="text" name="emergency_contact" id="emergency_contact"
              class="form-control mb-3"
              placeholder="Emergency Contact Number"
+             pattern="\d{4}"
+             maxlength="4"
              value="{{ doctor.emergency_contact or '' }}">
 
       <button class="btn btn-info fw-bold w-100">
@@ -302,6 +320,100 @@ document.addEventListener('DOMContentLoaded', function() {
   const circumference = 2 * Math.PI * 50; // radius is 50
   const specialtySelect = document.getElementById('specialty');
   const feesDisplay = document.getElementById('fees_display');
+  const stateSelect = document.getElementById('state');
+  const citySelect = document.getElementById('city');
+  const latitudeInput = document.getElementById('latitude');
+  const longitudeInput = document.getElementById('longitude');
+  const useCurrentLocationBtn = document.getElementById('useCurrentLocationBtn');
+  const locationStatus = document.getElementById('locationStatus');
+
+  const indiaStateCities = {
+    'Andhra Pradesh': ['Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Kurnool', 'Rajahmundry'],
+    'Arunachal Pradesh': ['Itanagar', 'Naharlagun', 'Tawang', 'Pasighat', 'Ziro'],
+    'Assam': ['Guwahati', 'Silchar', 'Dibrugarh', 'Jorhat', 'Nagaon', 'Tezpur'],
+    'Bihar': ['Patna', 'Gaya', 'Muzaffarpur', 'Bhagalpur', 'Purnia', 'Darbhanga'],
+    'Chhattisgarh': ['Raipur', 'Bilaspur', 'Durg', 'Bhilai', 'Korba', 'Rajnandgaon'],
+    'Goa': ['Panaji', 'Margao', 'Vasco da Gama', 'Mapusa', 'Ponda'],
+    'Gujarat': ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar'],
+    'Haryana': ['Gurugram', 'Faridabad', 'Panipat', 'Ambala', 'Hisar', 'Karnal'],
+    'Himachal Pradesh': ['Shimla', 'Mandi', 'Solan', 'Dharamshala', 'Kullu', 'Hamirpur'],
+    'Jharkhand': ['Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro', 'Hazaribagh', 'Deoghar'],
+    'Karnataka': ['Bengaluru', 'Mysuru', 'Mangaluru', 'Hubballi', 'Belagavi', 'Shivamogga'],
+    'Kerala': ['Thiruvananthapuram', 'Kochi', 'Kozhikode', 'Thrissur', 'Kollam', 'Kannur'],
+    'Madhya Pradesh': ['Bhopal', 'Indore', 'Gwalior', 'Jabalpur', 'Ujjain', 'Sagar'],
+    'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Aurangabad', 'Thane'],
+    'Manipur': ['Imphal', 'Thoubal', 'Bishnupur', 'Churachandpur', 'Kakching'],
+    'Meghalaya': ['Shillong', 'Tura', 'Jowai', 'Nongpoh', 'Baghmara'],
+    'Mizoram': ['Aizawl', 'Lunglei', 'Champhai', 'Serchhip', 'Kolasib'],
+    'Nagaland': ['Kohima', 'Dimapur', 'Mokokchung', 'Wokha', 'Tuensang'],
+    'Odisha': ['Bhubaneswar', 'Cuttack', 'Rourkela', 'Puri', 'Sambalpur', 'Berhampur'],
+    'Punjab': ['Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda', 'Mohali'],
+    'Rajasthan': ['Jaipur', 'Jodhpur', 'Kota', 'Udaipur', 'Bikaner', 'Ajmer'],
+    'Sikkim': ['Gangtok', 'Namchi', 'Geyzing', 'Mangan', 'Rangpo'],
+    'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Salem', 'Tiruchirappalli', 'Vellore'],
+    'Telangana': ['Hyderabad', 'Warangal', 'Nizamabad', 'Karimnagar', 'Khammam', 'Nalgonda'],
+    'Tripura': ['Agartala', 'Udaipur', 'Dharmanagar', 'Kailasahar', 'Belonia'],
+    'Uttar Pradesh': ['Lucknow', 'Kanpur', 'Varanasi', 'Agra', 'Prayagraj', 'Noida'],
+    'Uttarakhand': ['Dehradun', 'Haridwar', 'Rishikesh', 'Haldwani', 'Roorkee'],
+    'West Bengal': ['Kolkata', 'Howrah', 'Durgapur', 'Asansol', 'Siliguri', 'Kharagpur'],
+    'Andaman Nicobar Islands': ['Port Blair'],
+    'Chandigarh': ['Chandigarh'],
+    'Dadra Nagar Haveli and Daman Diu': ['Daman', 'Diu', 'Silvassa'],
+    'Delhi': ['New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi'],
+    'Jammu Kashmir': ['Srinagar', 'Jammu', 'Anantnag', 'Baramulla', 'Kathua'],
+    'Ladakh': ['Leh', 'Kargil'],
+    'Lakshadweep': ['Kavaratti'],
+    'Puducherry': ['Puducherry', 'Karaikal', 'Mahe', 'Yanam']
+  };
+
+  function populateStates(selectedState) {
+    stateSelect.innerHTML = '<option value="">Select State</option>';
+    const states = Object.keys(indiaStateCities).sort();
+
+    if (selectedState && !states.includes(selectedState)) {
+      const extra = document.createElement('option');
+      extra.value = selectedState;
+      extra.textContent = selectedState;
+      stateSelect.appendChild(extra);
+    }
+
+    states.forEach(state => {
+      const option = document.createElement('option');
+      option.value = state;
+      option.textContent = state;
+      stateSelect.appendChild(option);
+    });
+
+    if (selectedState) stateSelect.value = selectedState;
+  }
+
+  function populateCities(state, selectedCity) {
+    citySelect.innerHTML = '<option value="">Select City</option>';
+
+    if (!state || !indiaStateCities[state]) {
+      citySelect.disabled = true;
+      return;
+    }
+
+    citySelect.disabled = false;
+    const cities = indiaStateCities[state];
+
+    if (selectedCity && !cities.includes(selectedCity)) {
+      const extra = document.createElement('option');
+      extra.value = selectedCity;
+      extra.textContent = selectedCity;
+      citySelect.appendChild(extra);
+    }
+
+    cities.forEach(city => {
+      const option = document.createElement('option');
+      option.value = city;
+      option.textContent = city;
+      citySelect.appendChild(option);
+    });
+
+    if (selectedCity) citySelect.value = selectedCity;
+  }
 
   // Specialty to fees mapping
   const specialtyFees = {
@@ -350,12 +462,50 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  function fillCurrentLocation() {
+    if (!navigator.geolocation) {
+      locationStatus.textContent = 'Geolocation not supported.';
+      return;
+    }
+
+    locationStatus.textContent = 'Fetching location...';
+    useCurrentLocationBtn.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+      function(position) {
+        latitudeInput.value = position.coords.latitude.toFixed(6);
+        longitudeInput.value = position.coords.longitude.toFixed(6);
+        locationStatus.textContent = 'Location captured.';
+        useCurrentLocationBtn.disabled = false;
+        calculateProgressFromServer();
+      },
+      function() {
+        locationStatus.textContent = 'Unable to fetch location. Allow browser location permission.';
+        useCurrentLocationBtn.disabled = false;
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }
+
   // Initial calculation and fees display
+  const initialState = stateSelect.dataset.selected || '';
+  const initialCity = citySelect.dataset.selected || '';
+  populateStates(initialState);
+  populateCities(initialState, initialCity);
+
+  if (!latitudeInput.value.trim() || !longitudeInput.value.trim()) {
+    fillCurrentLocation();
+  }
+
   calculateProgressFromServer();
   updateFeesDisplay();
 
   // Update fees when specialty changes
   specialtySelect.addEventListener('change', updateFeesDisplay);
+  stateSelect.addEventListener('change', function() {
+    populateCities(this.value, '');
+  });
+  useCurrentLocationBtn.addEventListener('click', fillCurrentLocation);
 
   // Update on input/change for all form fields
   form.querySelectorAll('input, textarea, select').forEach(field => {
