@@ -73,6 +73,14 @@ form.addEventListener('submit', function(e) {
 
   if (!valid) e.preventDefault();
 });
+
+// On login page, browser back should go to Home.
+if (window.history && window.history.pushState) {
+  window.history.pushState({ fromLogin: true }, '', window.location.href);
+  window.addEventListener('popstate', function() {
+    window.location.href = '/';
+  });
+}
 </script>
 
 <!-- ================= STYLES ================= -->

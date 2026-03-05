@@ -3,9 +3,9 @@
 
 <!-- Back Button -->
 <div class="position-fixed top-0 start-0 p-3" style="z-index:1050;">
-  <button class="btn prev-btn" onclick="window.history.back()" aria-label="Previous">
+  <a href="{{ '/doctor/dashboard' if session.get('role') == 'doctor' else '/dashboard' }}" class="btn prev-btn" aria-label="Back to Dashboard">
     <i class="fa-solid fa-arrow-left"></i>
-  </button>
+  </a>
 </div>
 
 <div class="container-fluid py-5" style="background:#0f172a;min-height:100vh;">

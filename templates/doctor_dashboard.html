@@ -78,7 +78,7 @@
   <!-- Stats Grid -->
   <div class="row g-4 mb-4">
     <div class="col-lg-3 col-md-6 col-sm-6">
-      <div class="card stats-card p-4 flat-card" onclick="showPatientsList()" style="cursor:pointer;">
+      <div class="card stats-card p-4 flat-card">
         <div class="stats-icon"><i class="fa-solid fa-users text-primary"></i></div>
         <div class="stats-content">
           <h3>{{ total_patients or 0 }}</h3>
@@ -396,3 +396,4 @@ document.addEventListener("DOMContentLoaded", function () {
 </script>
 
 {% endblock %}
+

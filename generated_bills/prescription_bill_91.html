@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prescription Bill #91</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      color: #111;
+      background: #fff;
+    }
+    .page {
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 16px;
+    }
+    h1 {
+      margin: 0 0 16px;
+      font-size: 28px;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .meta-box {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+      font-size: 14px;
+    }
+    th {
+      background: #f5f5f5;
+    }
+    .num {
+      text-align: right;
+    }
+    .totals {
+      margin-top: 16px;
+      margin-left: auto;
+      width: 320px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 10px;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin: 6px 0;
+    }
+    .grand {
+      font-weight: bold;
+      font-size: 16px;
+    }
+    .actions {
+      margin-top: 18px;
+      display: flex;
+      gap: 10px;
+    }
+    .btn {
+      border: 1px solid #333;
+      background: #fff;
+      color: #111;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    @page {
+      margin: 12mm;
+      size: auto;
+    }
+    @media print {
+      .actions {
+        display: none;
+      }
+      .page {
+        margin: 0;
+        max-width: none;
+        padding: 0;
+      }
+      thead {
+        display: table-header-group;
+      }
+      tr {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Prescription Bill</h1>
+    <div class="meta">
+      <div class="meta-box">
+        <strong>Patient:</strong> Hirpara Hareshbhai<br>
+        <strong>Appointment Date:</strong> 2026-02-20
+      </div>
+      <div class="meta-box">
+        <strong>Doctor:</strong> Dr. Arva Hirpara<br>
+        <strong>Specialty:</strong> Gynaecology
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Medicine Name</th>
+          <th class="num">Tablets/Day</th>
+          <th class="num">Duration (Days)</th>
+          <th class="num">Quantity</th>
+          <th class="num">Price (INR)</th>
+          <th class="num">Total (INR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Paracetamol</td><td>2</td><td>5</td><td>10</td><td>25.00</td><td>250.00</td></tr>
+      </tbody>
+    </table>
+    <div class="totals">
+      <div class="row"><span>Subtotal</span><span>250.00</span></div>
+      <div class="row"><span>GST (18%)</span><span>45.00</span></div>
+      <div class="row grand"><span>Total</span><span>295.00</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn" onclick="window.print()">Print Bill</button>
+      <a class="btn" href="/prescription_bill/91">Back to Bill</a>
+      <button class="btn" onclick="window.location.href='/prescription_bill/91'">Go Back</button>
+    </div>
+  </div>
+  <script>
+    window.addEventListener('load', function () {
+      window.print();
+    });
+  </script>
+</body>
+</html>

@@ -111,6 +111,7 @@
             <button type="button" class="btn btn-success btn-sm mt-3" onclick="saveVitals()">
               <i class="fa-solid fa-save me-2"></i>Save Vitals
             </button>
+            <div id="vitalsMessage" class="mt-3" style="display:none;"></div>
           </form>
         </div>
       </div>
@@ -127,6 +128,7 @@
           <button class="btn btn-info btn-sm mt-2" onclick="saveNotes()">
             <i class="fa-solid fa-save me-2"></i>Save Notes
           </button>
+          <div id="notesMessage" class="mt-3" style="display:none;"></div>
         </div>
       </div>
     </div>
@@ -368,13 +370,20 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function saveVitals() {
+    const vitalsMessage = document.getElementById('vitalsMessage');
+    const showVitalsMessage = (message, type) => {
+        vitalsMessage.className = `alert alert-${type} mt-3`;
+        vitalsMessage.textContent = message;
+        vitalsMessage.style.display = 'block';
+    };
+
     const weight = document.getElementById('weight').value;
     const height = document.getElementById('height').value;
     const bpSystolic = document.getElementById('bpSystolic').value;
     const bpDiastolic = document.getElementById('bpDiastolic').value;
 
     if (!weight || !height || !bpSystolic || !bpDiastolic) {
-        alert('Please fill all fields');
+        showVitalsMessage('Please fill all fields.', 'danger');
         return;
     }
 
@@ -393,22 +402,29 @@ function saveVitals() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Vitals saved successfully!');
+            showVitalsMessage(data.message || 'Vitals saved successfully!', 'success');
             document.getElementById('vitalsForm').reset();
         } else {
-            alert('Error saving vitals: ' + data.message);
+            showVitalsMessage('Error saving vitals: ' + data.message, 'danger');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error saving vitals');
+        showVitalsMessage('Error saving vitals.', 'danger');
     });
 }
 
 function saveNotes() {
+    const notesMessage = document.getElementById('notesMessage');
+    const showNotesMessage = (message, type) => {
+        notesMessage.className = `alert alert-${type} mt-3`;
+        notesMessage.textContent = message;
+        notesMessage.style.display = 'block';
+    };
+
     const notes = document.getElementById('notesArea').value.trim();
     if (!notes) {
-        alert('Please enter some notes before saving.');
+        showNotesMessage('Please enter some notes before saving.', 'danger');
         return;
     }
 
@@ -424,14 +440,14 @@ function saveNotes() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert('Notes saved successfully!');
+            showNotesMessage('Notes saved successfully!', 'success');
         } else {
-            alert('Error saving notes: ' + data.message);
+            showNotesMessage('Error saving notes: ' + data.message, 'danger');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error saving notes');
+        showNotesMessage('Error saving notes.', 'danger');
     });
 }
 

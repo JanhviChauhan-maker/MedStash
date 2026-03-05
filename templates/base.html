@@ -146,6 +146,13 @@ function goToDashboard() {
 document.addEventListener('DOMContentLoaded', function() {
   autoDismissAlerts();
 });
+
+// If page is restored from browser back-forward cache, force reload so session checks run.
+window.addEventListener('pageshow', function(event) {
+  if (event.persisted) {
+    window.location.reload();
+  }
+});
 </script>
 </body>
 </html>

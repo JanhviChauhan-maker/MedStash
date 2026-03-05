@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, redirect, flash, session, url_for
+from flask import Flask, render_template, request, redirect, flash, session, url_for, send_file
 import sqlite3
 import os
 import heapq
 import collections
+import html
 from datetime import datetime, timedelta
 from abc import ABC, abstractmethod
 import math
@@ -509,6 +510,16 @@ class NotificationManager:
 # ---------------- GLOBAL FLASK APP INSTANCE ----------------
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'  # Should be from config
+
+
+@app.after_request
+def add_no_cache_headers(response):
+    # Prevent browser cache/back-forward cache from serving protected pages after logout.
+    if not request.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 # ---------------- UTILITY FUNCTIONS ----------------
 def get_db():
@@ -3190,44 +3201,35 @@ def patient_prescriptions():
     return render_template("patient_prescriptions.html", prescriptions_by_date=prescriptions_by_date)
 
 # ---------------- PRESCRIPTION BILL ----------------
-@app.route("/prescription_bill/<int:appointment_id>")
-def prescription_bill(appointment_id):
-    if "user_id" not in session or session.get("role") != "user":
-        return redirect("/login")
-
+def _build_prescription_bill_data(appointment_id, patient_user_id):
     conn = get_db()
 
-    # Verify the appointment belongs to the current user
-    appointment_check = conn.execute("""
-        SELECT id FROM appointments
-        WHERE id=? AND patient_id=?
-    """, (appointment_id, session["user_id"])).fetchone()
+    try:
+        appointment_check = conn.execute("""
+            SELECT id FROM appointments
+            WHERE id=? AND patient_id=?
+        """, (appointment_id, patient_user_id)).fetchone()
 
-    if not appointment_check:
+        if not appointment_check:
+            return None, "Appointment not found or access denied."
+
+        prescriptions = conn.execute("""
+            SELECT p.*, a.date as appointment_date,
+                   u.fname as patient_fname, u.lname as patient_lname,
+                   d.fname as doctor_fname, d.lname as doctor_lname, d.specialty
+            FROM prescriptions p
+            JOIN appointments a ON p.appointment_id = a.id
+            JOIN users u ON a.patient_id = u.id
+            JOIN doctors d ON a.doctor_id = d.id
+            WHERE p.appointment_id=?
+            ORDER BY p.created_at ASC
+        """, (appointment_id,)).fetchall()
+    finally:
         conn.close()
-        flash("Appointment not found or access denied.", "danger")
-        return redirect("/patient_prescriptions")
-
-    # Get prescription details
-    prescriptions = conn.execute("""
-        SELECT p.*, a.date as appointment_date,
-               u.fname as patient_fname, u.lname as patient_lname,
-               d.fname as doctor_fname, d.lname as doctor_lname, d.specialty
-        FROM prescriptions p
-        JOIN appointments a ON p.appointment_id = a.id
-        JOIN users u ON a.patient_id = u.id
-        JOIN doctors d ON a.doctor_id = d.id
-        WHERE p.appointment_id=?
-        ORDER BY p.created_at ASC
-    """, (appointment_id,)).fetchall()
-
-    conn.close()
 
     if not prescriptions:
-        flash("No prescriptions found for this appointment.", "warning")
-        return redirect("/patient_prescriptions")
+        return None, "No prescriptions found for this appointment."
 
-    # Calculate bill details
     medicines = []
     subtotal = 0
 
@@ -3247,12 +3249,11 @@ def prescription_bill(appointment_id):
 
         subtotal += total
 
-    # GST calculation (18% for medicines in India)
     gst_rate = 18
     gst_amount = subtotal * (gst_rate / 100)
     total_amount = subtotal + gst_amount
 
-    bill_data = {
+    return {
         'patient_name': f"{prescriptions[0]['patient_fname']} {prescriptions[0]['patient_lname']}",
         'doctor_name': f"Dr. {prescriptions[0]['doctor_fname']} {prescriptions[0]['doctor_lname']}",
         'doctor_specialty': prescriptions[0]['specialty'],
@@ -3262,9 +3263,215 @@ def prescription_bill(appointment_id):
         'gst_rate': gst_rate,
         'gst_amount': gst_amount,
         'total_amount': total_amount
-    }
+    }, None
 
-    return render_template("prescription_bill.html", bill=bill_data)
+
+def _write_printable_bill_file(appointment_id, bill_data):
+    safe_patient = html.escape(bill_data['patient_name'])
+    safe_doctor = html.escape(bill_data['doctor_name'])
+    safe_specialty = html.escape(str(bill_data['doctor_specialty'] or "N/A"))
+    safe_date = html.escape(str(bill_data['appointment_date'] or "N/A"))
+
+    medicine_rows = []
+    for medicine in bill_data['medicines']:
+        medicine_rows.append(
+            "<tr>"
+            f"<td>{html.escape(str(medicine['medicine_name'] or ''))}</td>"
+            f"<td>{medicine['tablets']}</td>"
+            f"<td>{medicine['duration']}</td>"
+            f"<td>{medicine['tablets'] * medicine['duration']}</td>"
+            f"<td>{medicine['price']:.2f}</td>"
+            f"<td>{medicine['total']:.2f}</td>"
+            "</tr>"
+        )
+
+    html_doc = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prescription Bill #{appointment_id}</title>
+  <style>
+    body {{
+      font-family: Arial, sans-serif;
+      margin: 0;
+      color: #111;
+      background: #fff;
+    }}
+    .page {{
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 16px;
+    }}
+    h1 {{
+      margin: 0 0 16px;
+      font-size: 28px;
+    }}
+    .meta {{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }}
+    .meta-box {{
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 10px;
+    }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }}
+    th, td {{
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+      font-size: 14px;
+    }}
+    th {{
+      background: #f5f5f5;
+    }}
+    .num {{
+      text-align: right;
+    }}
+    .totals {{
+      margin-top: 16px;
+      margin-left: auto;
+      width: 320px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 10px;
+    }}
+    .row {{
+      display: flex;
+      justify-content: space-between;
+      margin: 6px 0;
+    }}
+    .grand {{
+      font-weight: bold;
+      font-size: 16px;
+    }}
+    .actions {{
+      margin-top: 18px;
+      display: flex;
+      gap: 10px;
+    }}
+    .btn {{
+      border: 1px solid #333;
+      background: #fff;
+      color: #111;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }}
+    @page {{
+      margin: 12mm;
+      size: auto;
+    }}
+    @media print {{
+      .actions {{
+        display: none;
+      }}
+      .page {{
+        margin: 0;
+        max-width: none;
+        padding: 0;
+      }}
+      thead {{
+        display: table-header-group;
+      }}
+      tr {{
+        page-break-inside: avoid;
+      }}
+    }}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>Prescription Bill</h1>
+    <div class="meta">
+      <div class="meta-box">
+        <strong>Patient:</strong> {safe_patient}<br>
+        <strong>Appointment Date:</strong> {safe_date}
+      </div>
+      <div class="meta-box">
+        <strong>Doctor:</strong> {safe_doctor}<br>
+        <strong>Specialty:</strong> {safe_specialty}
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Medicine Name</th>
+          <th class="num">Tablets/Day</th>
+          <th class="num">Duration (Days)</th>
+          <th class="num">Quantity</th>
+          <th class="num">Price (INR)</th>
+          <th class="num">Total (INR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {''.join(medicine_rows)}
+      </tbody>
+    </table>
+    <div class="totals">
+      <div class="row"><span>Subtotal</span><span>{bill_data['subtotal']:.2f}</span></div>
+      <div class="row"><span>GST ({bill_data['gst_rate']}%)</span><span>{bill_data['gst_amount']:.2f}</span></div>
+      <div class="row grand"><span>Total</span><span>{bill_data['total_amount']:.2f}</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn" onclick="window.print()">Print Bill</button>
+      <a class="btn" href="/prescription_bill/{appointment_id}">Back to Bill</a>
+      <button class="btn" onclick="window.location.href='/prescription_bill/{appointment_id}'">Go Back</button>
+    </div>
+  </div>
+  <script>
+    window.addEventListener('load', function () {{
+      window.print();
+    }});
+  </script>
+</body>
+</html>
+"""
+
+    bills_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "generated_bills")
+    os.makedirs(bills_dir, exist_ok=True)
+    file_path = os.path.join(bills_dir, f"prescription_bill_{appointment_id}.html")
+
+    with open(file_path, "w", encoding="utf-8") as bill_file:
+        bill_file.write(html_doc)
+
+    return file_path
+
+
+@app.route("/prescription_bill/<int:appointment_id>")
+def prescription_bill(appointment_id):
+    if "user_id" not in session or session.get("role") != "user":
+        return redirect("/login")
+
+    bill_data, error = _build_prescription_bill_data(appointment_id, session["user_id"])
+    if error:
+        flash(error, "warning" if "No prescriptions" in error else "danger")
+        return redirect("/patient_prescriptions")
+
+    return render_template("prescription_bill.html", bill=bill_data, appointment_id=appointment_id)
+
+
+@app.route("/prescription_bill_print/<int:appointment_id>")
+def prescription_bill_print(appointment_id):
+    if "user_id" not in session or session.get("role") != "user":
+        return redirect("/login")
+
+    bill_data, error = _build_prescription_bill_data(appointment_id, session["user_id"])
+    if error:
+        flash(error, "warning" if "No prescriptions" in error else "danger")
+        return redirect("/patient_prescriptions")
+
+    file_path = _write_printable_bill_file(appointment_id, bill_data)
+    return send_file(file_path, mimetype="text/html")
 
 # ---------------- SAVE VITALS ----------------
 @app.route("/save_vitals/<int:patient_id>", methods=["POST"])
@@ -3507,3 +3714,78 @@ if __name__ == "__main__":
     app.run(debug=True)
 
 
+# 🚀 Excited to Present Our Project – MedStash 🏥💻
+
+
+
+# MedStash, a complete healthcare management platform developed by me along with my teammates Heer Hirpara and Nidhi.
+
+# MedStash digitally connects patients and doctors while managing appointments, billing, prescriptions, reminders, and medical records — all in one centralized system.
+
+
+
+# 👨‍⚕️ Doctor Dashboard
+
+# • View upcoming appointments
+
+# • Access appointment history
+
+# • Manage appointments
+
+# • Notification panel
+
+# • Digital prescription management
+
+# • Access patient medical records
+
+# • Billing management
+
+# • Wallet integration
+
+# • Complete consultation tracking 
+
+
+
+# 👩‍💻 Patient Dashboard
+
+# • Choose from multiple doctors & specialties
+
+# • Book appointments easily
+
+# • View upcoming appointments
+
+# • Access appointment history
+
+# • Automatic bill generation after booking
+
+# • View & manage digital medical records
+
+# • Track health charts 
+
+# • View billing history
+
+# • Download & print bills
+
+
+
+# 📊 System Highlights
+
+# • Role-based access control
+
+# • Secure data handling
+
+# • Centralized healthcare workflow
+
+# • End-to-end doctor & patient management
+
+
+
+# This project helped us strengthen our skills in system design, dashboard development, and building scalable healthcare solutions. Building this project significantly enhanced my problem-solving abilities, my understanding of backend development using Flask, database management with SQLite, system design concepts, and real-world healthcare system workflows.
+
+# I’m open to feedback and collaboration opportunities!
+
+# MedStash
+
+
+
+#  #Flask #SQLite #PythonDevelopment #HealthcareTechnology #HealthTech  #HospitalManagementSystem #WebDevelopment #TechProject #TeamWork #DigitalHealth #SoftwareDevelopment

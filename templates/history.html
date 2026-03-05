@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
 
+<!-- ================= BACK BUTTON ================= -->
+<div class="profile-back-btn">
+  <a href="/dashboard" title="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path d="M15 18l-6-6 6-6"
+            stroke="#ffffff"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"/>
+    </svg>
+  </a>
+</div>
+
 <!-- ================= APPOINTMENT HISTORY ================= -->
 
 <div class="container pro-history-container">
@@ -219,6 +232,32 @@ body{
   background:#0b0f1a;
   color:#e6edf6;
   font-family:'Outfit',sans-serif;
+}
+
+/* back button */
+
+.profile-back-btn{
+  position:fixed;
+  top:16px;
+  left:16px;
+  z-index:10;
+}
+
+.profile-back-btn a{
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  background:#0b1220;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 6px 14px rgba(0,0,0,.45);
+  transition:.2s;
+}
+
+.profile-back-btn a:hover{
+  transform:translateX(-3px);
+  background:#111a30;
 }
 
 /* layout */

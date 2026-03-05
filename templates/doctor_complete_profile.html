@@ -1,10 +1,16 @@
 {% extends "base.html" %}
 {% block content %}
 
-<!-- Back to Dashboard Button -->
-<div class="position-fixed top-0 end-0 p-3" style="z-index: 1050;">
-  <a href="/doctor/dashboard" class="btn btn-light fw-bold">
-    <i class="fa-solid fa-arrow-left me-2"></i>Back to Dashboard
+<!-- ================= BACK BUTTON ================= -->
+<div class="profile-back-btn">
+  <a href="/doctor/dashboard" title="Back">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path d="M15 18l-6-6 6-6"
+            stroke="#ffffff"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"/>
+    </svg>
   </a>
 </div>
 
@@ -193,17 +199,28 @@
 
 /* ---------------- Back button ---------------- */
 
-.position-fixed a.btn{
-  background:#121b2d;
-  color:#dbefff;
-  border:1px solid #22324a;
-  box-shadow:0 4px 10px rgba(0,0,0,.18);
+.profile-back-btn{
+  position:fixed;
+  top:16px;
+  left:16px;
+  z-index:10;
 }
 
-.position-fixed a.btn:hover{
-  border-color:#17a2b8;
-  color:#17a2b8;
-  background:#121b2d;
+.profile-back-btn a{
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  background:#0b1220;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 6px 14px rgba(0,0,0,.45);
+  transition:.2s;
+}
+
+.profile-back-btn a:hover{
+  transform:translateX(-3px);
+  background:#111a30;
 }
 
 /* ---------------- Headings ---------------- */

@@ -83,7 +83,7 @@
 
           <!-- Action Buttons -->
           <div class="text-center mt-4">
-            <button onclick="window.print()" class="btn btn-info me-2">
+            <button onclick="window.open('/prescription_bill_print/{{ appointment_id }}', '_blank')" class="btn btn-info me-2">
               <i class="fa-solid fa-print me-2"></i>Print Bill
             </button>
             <a href="/patient_prescriptions" class="btn btn-secondary">
@@ -101,19 +101,96 @@
 <!-- Print Styles -->
 <style>
 @media print {
+  @page {
+    margin: 10mm;
+    size: A4 landscape;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html,
   body {
     background: white !important;
     color: black !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .container {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .container,
+  .row,
+  .col-lg-8,
+  .card,
+  .card-body,
+  .table-responsive {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .row {
+    display: block !important;
+  }
+
+  .col-lg-8 {
+    flex: 0 0 100% !important;
+  }
+
+  .fa-solid,
+  .fa-regular,
+  .fas,
+  .far,
+  .fab {
+    display: none !important;
   }
 
   .card {
     background: white !important;
     border: 1px solid #ccc !important;
     box-shadow: none !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
   }
 
   .table {
     color: black !important;
+    border-collapse: collapse !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  .table th,
+  .table td {
+    color: black !important;
+    background: white !important;
+    border-color: #d0d0d0 !important;
+    font-size: 12px !important;
+    padding: 6px !important;
+    word-wrap: break-word !important;
+  }
+
+  .table td:first-child,
+  .table th:first-child {
+    width: 32% !important;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  td,
+  th {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
   }
 
   .text-info {
